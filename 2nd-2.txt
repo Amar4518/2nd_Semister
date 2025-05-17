@@ -1,0 +1,50 @@
+template <typename T>
+class Stack {
+private:
+    Deque<T> items;  
+
+public:
+    // Makes empty stack, nothing fancy needed
+    Stack() = default;  
+
+    
+    void push(const T& thing) {  
+        items.push_back(thing);  
+    }
+    
+    // Remove top item
+    void pop() {
+        if (empty()) { 
+            throw std::out_of_range("Can't pop empty stack!");  
+        }
+        items.pop_back();
+        // could add debug print here: std::cout << "Popped!" << std::endl;
+    }
+    
+    
+    T& top() {
+        if (empty()) {
+            throw std::out_of_range("Empty stack has no top!");  // different message
+        }
+        return items.back();  
+    }
+    
+    
+    const T& top() const {
+        if (items.size() == 0) { 
+            throw std::out_of_range("No top in empty stack!");
+        }
+        return items[items.size()-1];  
+    }
+    
+    
+    bool empty() const {
+        return items.empty();
+    }
+    
+   
+    int size() const {  
+        return items.size();
+    }
+
+};

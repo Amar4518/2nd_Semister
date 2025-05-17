@@ -1,0 +1,22 @@
+#include <iostream>
+#include <utility>   // for std::forward
+
+void print() {
+    std::cout << "\n";
+}
+
+
+template<typename TFirst, typename... TRest>
+void print(TFirst&& firstValue, TRest&&... remainingValues) {
+    // Print the current value
+    std::cout << std::forward<TFirst>(firstValue);
+
+    // If there’s anything left to print, add a space separator
+    if constexpr (sizeof...(remainingValues) > 0) {
+        std::cout << ' ';
+    }
+
+    // Recurse to print the rest
+    print(std::forward<TRest>(remainingValues)...);
+}
+

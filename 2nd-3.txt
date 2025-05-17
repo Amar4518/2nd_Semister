@@ -1,0 +1,93 @@
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <iomanip>
+
+/* Matrix template - fixed size, does basic math operations
+   T is type, Rows/Cols are dimensions (must be >0) */
+template<typename T, size_t Rows, size_t Cols>
+class Matrix {
+private:
+  
+    std::unique_ptr<T[]> data;  // Could use vector but wanted to try unique_ptr
+
+public:
+    // Make empty matrix (zeros)
+    Matrix() : data(new T[Rows*Cols]()) {}  // Direct init instead of make_unique
+
+    // Copy stuff
+    Matrix(const Matrix& other) : data(new T[Rows*Cols]) {
+        // Naive element-wise copy
+        for(size_t i = 0; i < Rows*Cols; i++) {
+            data[i] = other.data[i]; 
+        }
+    }
+
+    // Move constructor (steal data)
+    Matrix(Matrix&& other) noexcept {  
+        data.swap(other.data);  
+    }
+
+    // Copy assignment
+    Matrix& operator=(const Matrix& src) {
+        if(this == &src) return *this;  // Self-check
+        
+        // Manual copy (could reuse copy constructor)
+        for(size_t i = 0; i < Rows*Cols; i++) {
+            data[i] = src.data[i];
+        }
+        return *this;
+    }
+
+        T& operator()(size_t row, size_t col) {
+        
+        // if(row >= Rows || col >= Cols) throw "Index out of bounds!";
+        return data[row*Cols + col];
+    }
+
+    const T& operator()(size_t row, size_t col) const {
+        return data[row*Cols + col];  // Duplicate code, but whatever
+    }
+
+    // Matrix addition
+    Matrix operator+(const Matrix& rhs) const {
+        Matrix result;
+        // Element-wise add
+        for(size_t i = 0; i < Rows*Cols; i++) {
+            result.data[i] = data[i] + rhs.data[i];  // Simple but works
+        }
+        return result;
+    }
+
+    // Matrix multiplication 
+    template<size_t OtherCols>
+    auto operator*(const Matrix<T, Cols, OtherCols>& other) const {
+        Matrix<T, Rows, OtherCols> product;  // Result matrix
+        
+        // Classic triple loop (O(n³) baby!)
+        for(size_t i = 0; i < Rows; i++) {           // Our rows
+            for(size_t j = 0; j < OtherCols; j++) {  // Their columns
+                T sum = 0;
+                for(size_t k = 0; k < Cols; k++) {   // Dot product
+                    sum += (*this)(i,k) * other(k,j);
+                }
+                product(i,j) = sum;
+                // Could add early exit for sparse mats?
+            }
+        }
+        return product;
+    }
+
+    // Pretty print (not perfect but works)
+    void dump() const {
+        std::cout << "Matrix " << Rows << "x" << Cols << ":\n";
+        for(size_t i = 0; i < Rows; i++) {
+            for(size_t j = 0; j < Cols; j++) {
+                std::cout << std::setw(8) << (*this)(i,j);
+            }
+            std::cout << std::endl;  // Mix of \n and endl
+        }
+    }
+
+    
+};

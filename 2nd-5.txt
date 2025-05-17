@@ -1,0 +1,127 @@
+#include <memory>        
+#include <functional>    
+#include <utility>       
+
+template <typename T, typename Deleter = std::default_delete<T>>
+class shared_ptr {
+private:
+   
+    struct ControlBlock {
+        size_t ref_count{1};   // starts at 1 for the owning shared_ptr
+        T* managed_ptr;        // the actual object
+        Deleter deleter;       // how to delete it
+
+        ControlBlock(T* ptr, Deleter d)
+            : managed_ptr(ptr), deleter(std::move(d)) {}
+
+        ~ControlBlock() {
+            if (managed_ptr) {
+                deleter(managed_ptr);
+            }
+        }
+    };
+
+    ControlBlock* control{};   
+    void release_control() {
+        if (control && --control->ref_count == 0) {
+            delete control;
+        }
+    }
+
+public:
+    
+    // Constructors & Destructor (Rule of Five)
+    
+
+    // Default: empty shared_ptr
+    shared_ptr() noexcept = default;
+
+    // Main constructor: takes ownership of ptr, using Deleter d
+    explicit shared_ptr(T* ptr, Deleter d = Deleter())
+        : control(ptr ? new ControlBlock(ptr, std::move(d)) : nullptr) {}
+
+    // Copy constructor: increments ref_count
+    shared_ptr(const shared_ptr& other) noexcept
+        : control(other.control) {
+        if (control) {
+            ++control->ref_count;
+        }
+    }
+
+    // Copy assignment: release own, then share other's control block
+    shared_ptr& operator=(const shared_ptr& other) noexcept {
+        if (this != &other) {
+            release_control();
+            control = other.control;
+            if (control) {
+                ++control->ref_count;
+            }
+        }
+        return *this;
+    }
+
+    // Move constructor: steal the control block, leave other empty
+    shared_ptr(shared_ptr&& other) noexcept
+        : control(other.control) {
+        other.control = nullptr;
+    }
+
+    // Move assignment: release own, then steal other's, leave other empty
+    shared_ptr& operator=(shared_ptr&& other) noexcept {
+        if (this != &other) {
+            release_control();
+            control = other.control;
+            other.control = nullptr;
+        }
+        return *this;
+    }
+
+    // Destructor: decrement ref_count and clean up if needed
+    ~shared_ptr() {
+        release_control();
+    }
+    // Observers & Accessors
+    
+    // Get raw pointer
+    T* get() const noexcept {
+        return control ? control->managed_ptr : nullptr;
+    }
+
+    // Dereference operators
+    T& operator*() const {
+        return *get();
+    }
+
+    T* operator->() const {
+        return get();
+    }
+
+    // Number of shared owners
+    size_t use_count() const noexcept {
+        return control ? control->ref_count : 0;
+    }
+
+    // Is there an associated object?
+    explicit operator bool() const noexcept {
+        return get() != nullptr;
+    }
+
+   
+    // Modifiers
+    
+
+    // Release current object and take ownership of ptr
+    void reset(T* ptr = nullptr, Deleter d = Deleter()) {
+        // Drop our current reference
+        release_control();
+
+        // If new pointer is non-null, create a fresh control block
+        control = ptr ? new ControlBlock(ptr, std::move(d)) : nullptr;
+    }
+
+    // Exchange control blocks with another shared_ptr
+    void swap(shared_ptr& other) noexcept {
+        std::swap(control, other.control);
+    }
+};
+

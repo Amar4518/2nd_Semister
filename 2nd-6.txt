@@ -1,0 +1,168 @@
+#include <cstring>    
+#include <algorithm>  
+#include <stdexcept>
+
+
+class SimpleString {
+private:
+    
+    static constexpr size_t SMALL_BUFF_SIZE = 15;  // +1 for null terminator
+    
+    // Track storage state
+    bool using_small_buffer = true;  // true = use local buffer
+    size_t current_length = 0;       // actual string length
+    
+    // Union stores either local buffer or heap pointers
+    union {
+        char local_buff[SMALL_BUFF_SIZE + 1];  // +1 for null term
+        
+        struct {  // When using heap
+            char* heap_ptr;    // Pointer to dynamic memory
+            size_t heap_cap;   // Allocated capacity (excluding null)
+        };
+    };
+
+    // Clean up heap memory if needed
+    void release_resources() {
+        if (!using_small_buffer && heap_ptr) {
+            delete[] heap_ptr;     // Free heap memory
+            heap_ptr = nullptr;    // Prevent dangling pointer
+        }
+    }
+
+    // Switch to heap storage when we outgrow local buffer
+    void move_to_heap(size_t min_capacity) {
+        // Calculate new capacity (double current or min needed)
+        size_t new_cap = std::max(
+            min_capacity, 
+            using_small_buffer ? SMALL_BUFF_SIZE*2 : heap_cap*2
+        );
+        
+        // Allocate new memory (+1 for null terminator)
+        char* new_mem = new char[new_cap + 1];
+        
+        // Copy existing data (from either storage type)
+        if (using_small_buffer) {
+            std::memcpy(new_mem, local_buff, current_length);
+        } else {
+            std::memcpy(new_mem, heap_ptr, current_length);
+            delete[] heap_ptr;  // Free old heap memory
+        }
+        
+        // Null-terminate and update state
+        new_mem[current_length] = '\0';
+        heap_ptr = new_mem;
+        heap_cap = new_cap;
+        using_small_buffer = false;  // Now using heap
+    }
+
+public:
+    // Create empty string (uses local buffer)
+    SimpleString() {
+        local_buff[0] = '\0';  // Empty string
+    }
+
+    // Create from C-string (could use local or heap)
+    SimpleString(const char* input_str) {
+        size_t input_len = std::strlen(input_str);
+        
+        if (input_len <= SMALL_BUFF_SIZE) {
+            // Fits in local buffer
+            using_small_buffer = true;
+            std::memcpy(local_buff, input_str, input_len + 1);  // +1 for null
+            current_length = input_len;
+        } else {
+            // Needs heap allocation
+            using_small_buffer = false;
+            current_length = input_len;
+            heap_cap = input_len;  // No extra capacity initially
+            heap_ptr = new char[heap_cap + 1];
+            std::memcpy(heap_ptr, input_str, input_len + 1);
+        }
+    }
+
+    // Copy constructor (deep copy)
+    SimpleString(const SimpleString& other) 
+        : using_small_buffer(other.using_small_buffer),
+          current_length(other.current_length) 
+    {
+        if (using_small_buffer) {
+            std::memcpy(local_buff, other.local_buff, current_length + 1);
+        } else {
+            heap_cap = other.heap_cap;
+            heap_ptr = new char[heap_cap + 1];
+            std::memcpy(heap_ptr, other.heap_ptr, current_length + 1);
+        }
+    }
+
+    // Move constructor (steal resources)
+    SimpleString(SimpleString&& dying_obj) noexcept 
+        : using_small_buffer(dying_obj.using_small_buffer),
+          current_length(dying_obj.current_length) 
+    {
+        if (using_small_buffer) {
+            std::memcpy(local_buff, dying_obj.local_buff, current_length + 1);
+        } else {
+            // Steal heap pointers
+            heap_ptr = dying_obj.heap_ptr;
+            heap_cap = dying_obj.heap_cap;
+            
+            // Leave dying object in safe state
+            dying_obj.heap_ptr = nullptr;
+            dying_obj.current_length = 0;
+            dying_obj.using_small_buffer = true;
+            dying_obj.local_buff[0] = '\0';
+        }
+    }
+
+    // Cleanup when destroyed
+    ~SimpleString() {
+        release_resources();
+    }
+
+    // Basic string info
+    size_t length() const noexcept { return current_length; }
+    size_t capacity() const noexcept {
+        return using_small_buffer ? SMALL_BUFF_SIZE : heap_cap;
+    }
+
+    // Add single character
+    void append_char(char c) {
+        if (current_length + 1 > capacity()) {
+            move_to_heap(current_length + 1);  // Get more space
+        }
+        
+        // Add character and update null terminator
+        char* storage = using_small_buffer ? local_buff : heap_ptr;
+        storage[current_length] = c;
+        storage[++current_length] = '\0';
+    }
+
+    // Add C-style string
+    void append_string(const char* str) {
+        size_t add_len = std::strlen(str);
+        size_t new_total = current_length + add_len;
+        
+        if (new_total > capacity()) {
+            move_to_heap(new_total);  // Expand if needed
+        }
+        
+        // Copy new content
+        char* storage = using_small_buffer ? local_buff : heap_ptr;
+        std::memcpy(storage + current_length, str, add_len + 1);
+        current_length = new_total;
+    }
+
+    // Access characters (with bounds check)
+    char& at(size_t pos) {
+        if (pos >= current_length) {
+            throw std::out_of_range("String index out of range");
+        }
+        return using_small_buffer ? local_buff[pos] : heap_ptr[pos];
+    }
+
+   
+    }
+
+ 
+};
