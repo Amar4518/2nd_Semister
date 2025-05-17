@@ -1,0 +1,138 @@
+
+#include <iostream>
+#include <stdexcept>
+#include <algorithm>
+
+template <typename T>
+class Deque {
+private:
+    T* data;              
+    int capacity;         // max size
+    int length;          
+    int head;            // front index
+    int tail;            
+    void resize() {
+        // let's make it twice as big
+        int new_size = capacity * 2;
+        T* temp = new T[new_size];
+        
+       
+        for (int i = 0; i < length; i++) {
+            temp[i] = get(i);  // using get() helper instead of operator[]
+        }
+
+        delete[] data;         // cleanup old array
+        data = temp;
+        capacity = new_size;
+        head = 0;             // reset indices
+        tail = length - 1;    // points to last element
+    }
+
+    int wrap(int idx) const {
+        return (idx + capacity) % capacity;
+    }
+
+    T& get(int i) {
+        return data[wrap(head + i)];
+    }
+
+public:
+    // Initialize with reasonable default size
+    Deque(int initial_size = 8) : capacity(initial_size), length(0) {
+        data = new T[capacity];
+        head = 0;
+        tail = capacity - 1;
+    }
+
+    ~Deque() {
+        delete[] data;    // clean up our mess
+    }
+
+    // Copy constructor - deep copy
+    Deque(const Deque& other) : capacity(other.capacity), length(other.length) {
+        data = new T[capacity];
+        
+        for (int i = 0; i < length; i++)
+            data[i] = other[i];
+
+        head = 0;
+        tail = length - 1;
+    }
+
+    // Assignment operator
+    Deque& operator=(const Deque& other) {
+        if (this != &other) {  // check self-assignment
+            delete[] data;
+            
+            // copy everything
+            capacity = other.capacity;
+            length = other.length;
+            data = new T[capacity];
+            
+            for (int i = 0; i < length; i++) {
+                data[i] = other[i];
+            }
+            
+            head = 0;
+            tail = length - 1;
+        }
+        return *this;
+    }
+
+    // Add to end
+    void push_back(const T& val) {
+        if (length >= capacity) {
+            resize();  // make room if needed
+        }
+        tail = wrap(tail + 1);
+        data[tail] = val;
+        length++;
+    }
+
+    // Add to front
+    void push_front(const T& val) {
+        if (length >= capacity) {
+            resize();
+        }
+        head = wrap(head - 1);
+        data[head] = val;
+        length++;
+    }
+
+    // Remove from back
+    void pop_back() {
+        if (length == 0) {
+            throw std::out_of_range("Empty deque!");
+        }
+        tail = wrap(tail - 1);
+        length--;
+    }
+
+    // Remove from front
+    void pop_front() {
+        if (length == 0) {
+            throw std::out_of_range("Empty deque!");
+        }
+        head = wrap(head + 1);
+        length--;
+    }
+
+    // Access elements - bounds checking included
+    T& operator[](int i) {
+        if (i < 0 || i >= length) {
+            throw std::out_of_range("Invalid index!");
+        }
+        return get(i);
+    }
+
+    const T& operator[](int i) const {
+        if (i < 0 || i >= length) {
+            throw std::out_of_range("Invalid index!");
+        }
+        return data[wrap(head + i)];
+    }
+
+    // Basic getters
+    int size() const { return length; }
+    int get_capacity() const { return capacity; }  // renamed to be more descriptive
+};
